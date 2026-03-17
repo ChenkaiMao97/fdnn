@@ -26,22 +26,24 @@ import json
 import os
 import sys
 import torch
+from collections import OrderedDict
+import re
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONFIG — fill these in before running
 # ────────────────────────────────────────────────────────────────────────────
 
-MODEL_PATH = "/path/to/your/model"   # directory containing models/last_model.pt
+MODEL_PATH = "/media/ps3/chenkaim/checkpoints/copied_models/aperiodic_CondConv_30_pml_small-10_16_25T15_21_04"   # directory containing models/last_model.pt
 
 # Metadata baked into the exported file.
 # ln_R is the only value the solver actually uses at inference time.
 # The rest are informational (training provenance).
 META = {
     "fdnn_version":  "0.1.0",
-    "ln_R":          -16,             # trainer.ln_R
-    "pml_ranges":    [8, 12],         # trainer.pml_ranges  [pml_min, pml_max]
-    "domain_sizes":  [32, 96, 32, 96, 32, 96],  # trainer.domain_sizes [xmin,xmax, ...]
-    "residual_type": "sc_pml",        # trainer.residual_type
+    "ln_R":          -10,             # trainer.ln_R
+    "pml_ranges":    [30, 30, 30, 30, 30, 30],         # trainer.pml_ranges  [pml_min, pml_max]
+    "domain_sizes":  [128,256,128,256,96,128],  # trainer.domain_sizes [xmin,xmax, ...]
+    "residual_type": "SC-PML",        # trainer.residual_type
 }
 
 # ── TorchScript export ───────────────────────────────────────────────────────
@@ -59,6 +61,34 @@ TRACE_EXAMPLE_FREQ  = None   # e.g. torch.tensor([0.05 / 1.55])
 
 # ────────────────────────────────────────────────────────────────────────────
 
+def remap_state_dict(state_dict: "OrderedDict[str, torch.Tensor]") -> "OrderedDict[str, torch.Tensor]":
+    """
+    Remap checkpoint keys from the original MG_CondConv layout to the
+    TorchScript-compatible layout after the following renames:
+
+      DownSizedNetwork:
+        downs.N.0.*  →  down_blocks.N.*   (the residual_blocks)
+        downs.N.1.*  →  down_samples.N.*  (the Downsample)
+
+      UpSizedNetwork:
+        ups.N.0.*    →  up_samples.N.*    (the Upsample)
+        ups.N.1.*    →  up_blocks.N.*     (the residual_blocks)
+
+    This handles setup_down_net, solve_down_net, and solve_up_net.
+    """
+    new_sd: "OrderedDict[str, torch.Tensor]" = OrderedDict()
+    for k, v in state_dict.items():
+        # ── DownSizedNetwork: downs.N.0 → down_blocks.N
+        k = re.sub(r'(\.downs\.)(\d+)\.0\.', r'.down_blocks.\2.', k)
+        # ── DownSizedNetwork: downs.N.1 → down_samples.N
+        k = re.sub(r'(\.downs\.)(\d+)\.1\.', r'.down_samples.\2.', k)
+        # ── UpSizedNetwork: ups.N.0 → up_samples.N
+        k = re.sub(r'(\.ups\.)(\d+)\.0\.', r'.up_samples.\2.', k)
+        # ── UpSizedNetwork: ups.N.1 → up_blocks.N
+        k = re.sub(r'(\.ups\.)(\d+)\.1\.', r'.up_blocks.\2.', k)
+        new_sd[k] = v
+    return new_sd
+
 def load_model(model_path: str) -> torch.nn.Module:
     """
     Instantiate your model class and load the trained weights.
@@ -66,19 +96,20 @@ def load_model(model_path: str) -> torch.nn.Module:
     Edit this function to match your model's constructor and checkpoint format.
     This is the only place where your model's Python class is needed.
     """
-    # --- Edit below this line -------------------------------------------
 
-    # Example (replace with your actual imports and constructor):
-    #
-    #   sys.path.insert(0, "/path/to/waveynet3d")
-    #   from waveynet3d.models import model_factory
-    #   import gin
-    #   gin.parse_config_file(os.path.join(model_path, "config.gin"))
-    #   model = model_factory(domain_sizes=[64, 64, 64], paddings=[0, 0, 0])
+    import gin
+    sys.path.insert(0, model_path)          # makes waveynet3d importable
 
-    raise NotImplementedError(
-        "Edit load_model() in migrate_checkpoint.py to instantiate your model."
-    )
+    # parse gin config (same as NN_solver.init() did)
+    for f in os.listdir(model_path):
+        if f.endswith(".gin"):
+            gin.parse_config_file(os.path.join(model_path, f))
+
+    from waveynet3d.models import model_factory
+
+    # instantiate model — match whatever your gin config sets for domain_sizes
+    model = model_factory(domain_sizes=META["domain_sizes"], paddings=[0, 0, 0])
+
 
     # --- Load weights -------------------------------------------------------
     weights_path = os.path.join(model_path, "models", "last_model.pt")
@@ -87,6 +118,18 @@ def load_model(model_path: str) -> torch.nn.Module:
 
     ckpt = torch.load(weights_path, weights_only=False, map_location="cpu")
     state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
+
+    # Diagnostic: print old checkpoint keys vs new model keys for up_net
+    ckpt_up_keys = sorted([k for k in state_dict.keys() if 'up' in k])
+    model_up_keys = sorted([k for n, _ in model.named_parameters() if 'up' in n for k in [n]])
+
+    print("=== CHECKPOINT keys (up) ===")
+    for k in ckpt_up_keys[:20]: print(" ", k)
+    print("=== MODEL keys (up) ===")
+    for k in model_up_keys[:20]: print(" ", k)
+
+    state_dict = remap_state_dict(state_dict)
+
     model.load_state_dict(state_dict)
     model.eval()
     return model
@@ -128,7 +171,6 @@ def main():
     torch.jit.load(out_path, _extra_files=extra)
     assert json.loads(extra["meta.json"]) == META, "meta round-trip failed!"
     print("Sanity check passed.")
-
 
 if __name__ == "__main__":
     main()
