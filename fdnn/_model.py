@@ -9,7 +9,7 @@ checkpoint's "model_type" string, use the @register_model decorator:
 
     @register_model("MyModel")
     class MyModel(nn.Module):
-        def __init__(self, domain_sizes, paddings, **kwargs):
+        def __init__(self, **kwargs):   # match your model's actual __init__ signature
             super().__init__()
             ...
 
