@@ -15,7 +15,8 @@ Quick start::
         "device":     "cuda:0",
     })
 
-    E, residuals = solver.solve(eps, src)
+    E, residuals = solver.solve(eps, src, wavelength=1.55, dL=0.05,
+                                pml_layers=(10, 10, 10, 10, 10, 10))
     # E:         (N, sx, sy, sz, 3)  complex64 E-field
     # residuals: list[float]         one per mini-batch chunk
 """

@@ -21,23 +21,23 @@ class NN_solver:
 
         solver = fdnn.NN_solver(model_path="./my_model")
         solver.config({
-            "sim_shape":   (64, 64, 64),
-            "wavelength":  1.55,
-            "dL":          0.05,
-            "pml_layers":  (10, 10, 10, 10, 10, 10),
-            "tol":         1e-5,
-            "max_iter":    100,
-            "restart":     10,
-            "batch_size":  4,
-            "device":      "cuda:0",
+            "tol":        1e-5,
+            "max_iter":   100,
+            "restart":    10,
+            "batch_size": 4,
+            "device":     "cuda:0",
             # multi-GPU:
             # "multi_gpu": True,
             # "gpu_ids":   [0, 1, 2, 3],
         })
 
-        # eps: (N, sx, sy, sz)  — permittivity, real-valued
-        # src: (N, sx, sy, sz, 6) — source, real repr. of 3 complex components
-        E, residuals = solver.solve(eps, src)
+        # Physics parameters are per-solve, not stored in config:
+        E, residuals = solver.solve(
+            eps, src,
+            wavelength=1.55,
+            dL=0.05,
+            pml_layers=(10, 10, 10, 10, 10, 10),
+        )
         # E:         (N, sx, sy, sz, 3), torch.complex64
         # residuals: list[float], one per mini-batch chunk
 
@@ -48,13 +48,13 @@ class NN_solver:
         {
             "state_dict": <OrderedDict>,
             "meta": {
-                "fdnn_version": "0.1.0",
-                "model_type":   "<registered model key>",
-                "model_kwargs": { ... },   # passed to model constructor
-                "ln_R":         -16,
-                "pml_ranges":   [...],     # informational
-                "domain_sizes": [...],     # informational
-                "residual_type": "...",    # informational
+                "fdnn_version":  "0.1.0",
+                "model_type":    "<registered model key>",
+                "model_kwargs":  { ... },   # passed to model constructor
+                "ln_R":          -16,
+                "pml_ranges":    [...],     # informational
+                "domain_sizes":  [...],     # informational
+                "residual_type": "...",     # informational
             }
         }
 
@@ -72,7 +72,8 @@ class NN_solver:
             )
         self._cfg = SolverConfig()
         self._initialized = False
-        # gpu_id -> {"model": nn.Module, "pml_channels": Tensor}
+        self._ln_R: Optional[float] = None
+        # gpu_id -> {"model": nn.Module}
         self._gpu_contexts: Dict[Optional[int], dict] = {}
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -99,6 +100,9 @@ class NN_solver:
         self,
         eps: Union[torch.Tensor, np.ndarray],
         src: Union[torch.Tensor, np.ndarray],
+        wavelength: float,
+        dL: float,
+        pml_layers: Tuple[int, int, int, int, int, int],
     ) -> Tuple[torch.Tensor, List[float]]:
         """Solve the Maxwell FDFD system.
 
@@ -110,6 +114,12 @@ class NN_solver:
         src:
             Source field, real representation of three complex E components.
             Shape ``(N, sx, sy, sz, 6)``.
+        wavelength:
+            Free-space wavelength, same units as dL.
+        dL:
+            Grid spacing (isotropic).
+        pml_layers:
+            PML thickness in voxels: ``(x_lo, x_hi, y_lo, y_hi, z_lo, z_hi)``.
 
         Returns
         -------
@@ -118,6 +128,12 @@ class NN_solver:
         residuals:
             List of final relative residuals (one float per mini-batch chunk).
         """
+        if len(pml_layers) != 6:
+            raise ValueError(
+                "pml_layers must have exactly 6 values: "
+                "(x_lo, x_hi, y_lo, y_hi, z_lo, z_hi)"
+            )
+
         self._init()
 
         eps = _to_tensor(eps, torch.float32)
@@ -129,10 +145,12 @@ class NN_solver:
             src = src.unsqueeze(0)
 
         gpu_ids = self._get_gpu_ids()
+        kwargs = dict(wavelength=wavelength, dL=dL, pml_layers=pml_layers)
+
         if self._cfg.multi_gpu and len(gpu_ids) > 1:
-            E, residuals = self._solve_multi_gpu(eps, src, gpu_ids)
+            E, residuals = self._solve_multi_gpu(eps, src, gpu_ids, **kwargs)
         else:
-            E, residuals = self._solve_batched(eps, src, gpu_ids[0])
+            E, residuals = self._solve_batched(eps, src, gpu_ids[0], **kwargs)
 
         if squeeze:
             E = E.squeeze(0)
@@ -142,6 +160,7 @@ class NN_solver:
     # ── Initialisation ────────────────────────────────────────────────────────
 
     def _init(self) -> None:
+        """Load model from checkpoint. Called once on first solve()."""
         if self._initialized:
             return
         self._cfg.validate()
@@ -155,31 +174,18 @@ class NN_solver:
 
         ckpt = torch.load(ckpt_path, weights_only=False, map_location="cpu")
         meta = ckpt["meta"]
-        state_dict = ckpt["state_dict"]
-        ln_R = meta["ln_R"]
+        self._ln_R = meta["ln_R"]
 
-        # Build one model on CPU, then copy to each GPU.
+        # Build model on CPU once, then copy to each target device.
         model_cpu = build_model(meta["model_type"], meta["model_kwargs"])
-        model_cpu.load_state_dict(state_dict)
+        model_cpu.load_state_dict(ckpt["state_dict"])
         model_cpu.eval()
 
-        gpu_ids = self._get_gpu_ids()
         self._gpu_contexts = {}
-
-        for gpu_id in gpu_ids:
+        for gpu_id in self._get_gpu_ids():
             dev = _device_str(gpu_id)
-            model_dev = copy.deepcopy(model_cpu).to(dev)
-            pml_ch = build_pml_channels(
-                sim_shape=self._cfg.sim_shape,
-                wavelength=self._cfg.wavelength,
-                dL=self._cfg.dL,
-                pml_layers=self._cfg.pml_layers,
-                ln_R=ln_R,
-                device=dev,
-            )
             self._gpu_contexts[gpu_id] = {
-                "model": model_dev,
-                "pml_channels": pml_ch,  # (1, sx, sy, sz, n_pml_ch)
+                "model": copy.deepcopy(model_cpu).to(dev),
             }
 
         self._initialized = True
@@ -201,8 +207,10 @@ class NN_solver:
         eps: torch.Tensor,
         src: torch.Tensor,
         gpu_id: Optional[int],
+        wavelength: float,
+        dL: float,
+        pml_layers: tuple,
     ) -> Tuple[torch.Tensor, List[float]]:
-        """Sequentially process chunks of batch_size on a single GPU."""
         N = eps.shape[0]
         bs = self._cfg.batch_size
         E_parts: List[torch.Tensor] = []
@@ -210,7 +218,10 @@ class NN_solver:
 
         for start in range(0, N, bs):
             end = min(start + bs, N)
-            E_chunk, res = self._solve_chunk(eps[start:end], src[start:end], gpu_id)
+            E_chunk, res = self._solve_chunk(
+                eps[start:end], src[start:end], gpu_id,
+                wavelength, dL, pml_layers,
+            )
             E_parts.append(E_chunk.cpu())
             residuals.append(res)
 
@@ -221,8 +232,10 @@ class NN_solver:
         eps: torch.Tensor,
         src: torch.Tensor,
         gpu_ids: List[int],
+        wavelength: float,
+        dL: float,
+        pml_layers: tuple,
     ) -> Tuple[torch.Tensor, List[float]]:
-        """Distribute batch across GPUs; each sub-batch runs in its own thread."""
         N = eps.shape[0]
         n_gpus = len(gpu_ids)
         chunk_size = (N + n_gpus - 1) // n_gpus
@@ -233,7 +246,8 @@ class NN_solver:
             if start >= N:
                 return i, None, None
             E_chunk, r_chunk = self._solve_batched(
-                eps[start:end], src[start:end], gpu_id
+                eps[start:end], src[start:end], gpu_id,
+                wavelength, dL, pml_layers,
             )
             return i, E_chunk, r_chunk
 
@@ -259,6 +273,9 @@ class NN_solver:
         eps_chunk: torch.Tensor,
         src_chunk: torch.Tensor,
         gpu_id: Optional[int],
+        wavelength: float,
+        dL: float,
+        pml_layers: tuple,
     ) -> Tuple[torch.Tensor, float]:
         """Run one GMRES solve on a single mini-batch chunk."""
         from fdnn.solvers.gmres import mygmrestorch
@@ -266,33 +283,45 @@ class NN_solver:
         from fdnn.utils.utils import c2r, r2c
 
         cfg = self._cfg
-        ctx = self._gpu_contexts[gpu_id]
-        model = ctx["model"]
-        pml_channels = ctx["pml_channels"]  # (1, sx, sy, sz, n_pml_ch)
-
+        model = self._gpu_contexts[gpu_id]["model"]
         dev = _device_str(gpu_id)
+
         eps_chunk = eps_chunk.to(dev)
         src_chunk = src_chunk.to(dev)
 
-        # Expand PML channels to batch size, concatenate with eps.
+        # Build PML channels for this specific (sim_shape, wl, dL, pmls).
+        # Cheap to compute (pure numpy → tensor), so done per chunk.
+        sim_shape = tuple(eps_chunk.shape[1:])  # (sx, sy, sz)
+        pml_channels = build_pml_channels(
+            sim_shape=sim_shape,
+            wavelength=wavelength,
+            dL=dL,
+            pml_layers=pml_layers,
+            ln_R=self._ln_R,
+            device=dev,
+        )  # (1, sx, sy, sz, n_pml_ch)
+
+        # Concatenate eps with PML channels.
         # Shape: (bs, sx, sy, sz, 1 + n_pml_ch)
         n = eps_chunk.shape[0]
-        batch_pml = pml_channels.expand(n, -1, -1, -1, -1)
-        eps_with_pml = torch.cat([eps_chunk.unsqueeze(-1), batch_pml], dim=-1)
+        eps_with_pml = torch.cat(
+            [eps_chunk.unsqueeze(-1), pml_channels.expand(n, -1, -1, -1, -1)],
+            dim=-1,
+        )
 
         Aop = lambda x: r2c(
             residue_E(
                 c2r(x), eps_with_pml[..., 0], src_chunk,
-                cfg.pml_layers, cfg.dL, cfg.wavelength,
+                pml_layers, dL, wavelength,
                 batched_compute=True, Aop=True,
             )
         )
 
         gmres = mygmrestorch(model, Aop, tol=cfg.tol, max_iter=cfg.max_iter)
-        freq = torch.tensor(cfg.dL / cfg.wavelength).unsqueeze(0).to(dev)
+        freq = torch.tensor(dL / wavelength).unsqueeze(0).to(dev)
         gmres.setup_eps(eps_with_pml, freq)
 
-        complex_rhs = r2c(src2rhs(src_chunk, cfg.dL, cfg.wavelength))
+        complex_rhs = r2c(src2rhs(src_chunk, dL, wavelength))
 
         if cfg.restart == 0:
             x, relres_history, _, _ = gmres.solve(complex_rhs, cfg.verbose)
