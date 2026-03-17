@@ -1,5 +1,6 @@
 import copy
 import gc
+import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple, Union
@@ -8,7 +9,6 @@ import numpy as np
 import torch
 
 from fdnn.config import SolverConfig
-from fdnn._model import build_model
 from fdnn._pml import build_pml_channels
 
 
@@ -160,7 +160,7 @@ class NN_solver:
     # ── Initialisation ────────────────────────────────────────────────────────
 
     def _init(self) -> None:
-        """Load model from checkpoint. Called once on first solve()."""
+        """Load TorchScript model from checkpoint. Called once on first solve()."""
         if self._initialized:
             return
         self._cfg.validate()
@@ -172,15 +172,16 @@ class NN_solver:
                 "Migrate your old checkpoint with scripts/migrate_checkpoint.py."
             )
 
-        ckpt = torch.load(ckpt_path, weights_only=False, map_location="cpu")
-        meta = ckpt["meta"]
+        # Load TorchScript model; meta is embedded as an extra file.
+        extra_files = {"meta.json": ""}
+        model_cpu = torch.jit.load(
+            ckpt_path, map_location="cpu", _extra_files=extra_files
+        )
+        meta = json.loads(extra_files["meta.json"])
         self._ln_R = meta["ln_R"]
-
-        # Build model on CPU once, then copy to each target device.
-        model_cpu = build_model(meta["model_type"], meta["model_kwargs"])
-        model_cpu.load_state_dict(ckpt["state_dict"])
         model_cpu.eval()
 
+        # Copy to each target device.
         self._gpu_contexts = {}
         for gpu_id in self._get_gpu_ids():
             dev = _device_str(gpu_id)

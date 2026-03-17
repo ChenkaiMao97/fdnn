@@ -26,4 +26,5 @@ from fdnn.config import SolverConfig
 from fdnn import hub
 
 __all__ = ["NN_solver", "SolverConfig", "hub"]
+
 __version__ = "0.1.0"
