@@ -37,7 +37,6 @@ class mygmres():
 
     @torch.no_grad()
     def solve(self, b, tol=1e-6, max_iter=100, start_iter=0, relres_history=None, init_b_norm=None, verbose=False, return_xr_history=False, plot_iters=None, complex_type=torch.complex128):
-        print("return_xr_history: ", return_xr_history, "plot_iters: ", plot_iters)
         assert torch.is_complex(b), "b must be complex"
         b = b.to(complex_type)
 
@@ -169,7 +168,6 @@ class mygmrestorch(mygmres):
 
     def solve_with_restart(self, b, tol, max_iter, restart, verbose, init_x=None, return_xr_history=False, plot_iters=None):
         assert torch.is_complex(b), "b must be complex"
-        print("init_x: ", init_x, "1: ", return_xr_history, plot_iters)
 
         with torch.no_grad():
             init_b_norm = self.vecnorm(b)
