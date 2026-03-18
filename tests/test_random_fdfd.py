@@ -124,9 +124,9 @@ def main():
                         help="HuggingFace read token (for private repos).")
     parser.add_argument("--device", default="cuda:0",
                         help="Torch device, e.g. 'cuda:0' or 'cpu'.")
-    parser.add_argument("--size", type=int, default=64,
+    parser.add_argument("--size", type=int, default=128,
                         help="Cubic domain size (voxels per side). Use 32 for a quick CPU test.")
-    parser.add_argument("--pml", type=int, default=10,
+    parser.add_argument("--pml", type=int, default=30,
                         help="PML thickness on each face (voxels).")
     parser.add_argument("--wavelength", type=float, default=1.55,
                         help="Free-space wavelength (same units as --dL).")
