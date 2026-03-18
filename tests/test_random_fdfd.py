@@ -211,7 +211,7 @@ def main():
 
     # Convenience plot functions
     plot_eps    = partial(plot_3slices, ticks=False, colorbar=True,
-                          my_cmap=plt.cm.viridis, cm_zero_center=False)
+                          my_cmap=plt.cm.binary, cm_zero_center=False)
     plot_fields = partial(plot_3slices, ticks=False, colorbar=True,
                           my_cmap=plt.cm.seismic, cm_zero_center=True)
 
