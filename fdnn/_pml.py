@@ -58,20 +58,30 @@ def build_pml_channels(
     torch.Tensor of shape (1, sx, sy, sz, n_pml_channels), dtype float32.
     """
     
-    mask = torch.zeros(sim_shape, dtype=torch.complex64) # (sx, sy, sz)
-    omega = 2*np.pi/wl # narutal unit with C_0 as 1
-    dxes = ([np.array([dL]*sim_shape[0]), np.array([dL]*sim_shape[1]), np.array([dL]*sim_shape[2])], [np.array([dL]*sim_shape[0]), np.array([dL]*sim_shape[1]), np.array([dL]*sim_shape[2])])
+    omega = 2 * np.pi / wavelength  # natural unit with C_0 = 1
+    dxes = (
+        [np.array([dL] * sim_shape[0]), np.array([dL] * sim_shape[1]), np.array([dL] * sim_shape[2])],
+        [np.array([dL] * sim_shape[0]), np.array([dL] * sim_shape[1]), np.array([dL] * sim_shape[2])],
+    )
 
     dxes = apply_scpml(dxes, pml_layers, omega, ln_R=ln_R)
 
     masks = []
     if pml_layers[0] > 0 or pml_layers[1] > 0:
-        masks.append(1 * torch.from_numpy(dxes[0][0][:, None, None]/dL).repeat(1, shape[1], shape[2]).imag.float())
+        masks.append(
+            torch.from_numpy(dxes[0][0][:, None, None] / dL)
+            .repeat(1, sim_shape[1], sim_shape[2]).imag.float()
+        )
     if pml_layers[2] > 0 or pml_layers[3] > 0:
-        masks.append(1 * torch.from_numpy(dxes[0][1][None, :, None]/dL).repeat(shape[0], 1, shape[2]).imag.float())
+        masks.append(
+            torch.from_numpy(dxes[0][1][None, :, None] / dL)
+            .repeat(sim_shape[0], 1, sim_shape[2]).imag.float()
+        )
     if pml_layers[4] > 0 or pml_layers[5] > 0:
-        masks.append(1 * torch.from_numpy(dxes[0][2][None, None, :]/dL).repeat(shape[0], shape[1], 1).imag.float())
-    
-    pml_channel = torch.stack(masks, dim=-1)
-    
-    return pml_channel
+        masks.append(
+            torch.from_numpy(dxes[0][2][None, None, :] / dL)
+            .repeat(sim_shape[0], sim_shape[1], 1).imag.float()
+        )
+
+    pml_channel = torch.stack(masks, dim=-1)  # (sx, sy, sz, n_pml_ch)
+    return pml_channel.unsqueeze(0).to(device)  # (1, sx, sy, sz, n_pml_ch)

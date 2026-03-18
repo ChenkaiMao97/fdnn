@@ -17,14 +17,12 @@ dependencies = [
     "matplotlib",
     "plotly",
     "scikit-image",
+    "huggingface_hub>=0.20",
 ]
 
 [project.optional-dependencies]
 gpu-utils = [
     "gpustat",           # for fdnn.utils.get_least_used_gpu()
-]
-hub = [
-    "huggingface_hub>=0.20",   # for fdnn.hub.download() when implemented
 ]
 dev = [
     "pytest",
