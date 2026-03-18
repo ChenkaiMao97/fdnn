@@ -1,11 +1,11 @@
 """
-fdnn — Finite Difference Neural Network solver for 3D Maxwell FDFD.
+nnfd — Finite Difference Neural Network solver for 3D Maxwell FDFD.
 
 Quick start::
 
-    import fdnn
+    import nnfd
 
-    solver = fdnn.NN_solver(model_path="./my_model")  # or set FDNN_MODEL_PATH
+    solver = nnfd.NN_solver(model_path="./my_model")  # or set NNFD_MODEL_PATH
     solver.config({
         "sim_shape":  (64, 64, 64),
         "wavelength": 1.55,
@@ -21,9 +21,9 @@ Quick start::
     # residuals: list[float]         one per mini-batch chunk
 """
 
-from fdnn.solver import NN_solver
-from fdnn.config import SolverConfig
-from fdnn import hub
+from nnfd.solver import NN_solver
+from nnfd.config import SolverConfig
+from nnfd import hub
 
 __all__ = ["NN_solver", "SolverConfig", "hub"]
 

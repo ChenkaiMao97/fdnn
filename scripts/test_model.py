@@ -1,8 +1,8 @@
 """
-Quick sanity-check for the exported fdnn TorchScript model.
+Quick sanity-check for the exported nnfd TorchScript model.
 
 Run from anywhere:
-    python /path/to/fdnn/scripts/test_model.py
+    python /path/to/nnfd/scripts/test_model.py
 """
 
 import json
@@ -10,7 +10,7 @@ import sys
 import torch
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-MODEL_PT = "/media/ps3/chenkaim/checkpoints/copied_models/aperiodic_CondConv_30_pml_small-10_16_25T15_21_04/models/fdnn_model.pt"
+MODEL_PT = "/media/ps3/chenkaim/checkpoints/copied_models/aperiodic_CondConv_30_pml_small-10_16_25T15_21_04/models/nnfd_model.pt"
 
 # Spatial size to test with — pick something small and fast on CPU.
 SX, SY, SZ = 32, 32, 32

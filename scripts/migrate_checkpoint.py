@@ -1,5 +1,5 @@
 """
-Migrate an old-format checkpoint to the fdnn TorchScript format.
+Migrate an old-format checkpoint to the nnfd TorchScript format.
 
 What this script does
 ---------------------
@@ -10,14 +10,14 @@ What this script does
    exposing Python source to end users.
 4. Embeds metadata (ln_R etc.) inside the .pt file as a JSON extra file.
 
-Output: <model_path>/models/fdnn_model.pt
+Output: <model_path>/models/nnfd_model.pt
   - A single TorchScript file.  No separate config, no model class required
     to load it.  Users cannot read the architecture from this file.
 
 Run this script from the repo root (where your model class is importable):
 
     cd /path/to/your/training/repo
-    python /path/to/fdnn/scripts/migrate_checkpoint.py
+    python /path/to/nnfd/scripts/migrate_checkpoint.py
 
 The original checkpoint is NOT modified.
 """
@@ -39,7 +39,7 @@ MODEL_PATH = "/media/ps3/chenkaim/checkpoints/copied_models/aperiodic_CondConv_3
 # ln_R is the only value the solver actually uses at inference time.
 # The rest are informational (training provenance).
 META = {
-    "fdnn_version":  "0.1.0",
+    "nnfd_version":  "0.1.0",
     "ln_R":          -10,             # trainer.ln_R
     "pml_ranges":    [30, 30, 30, 30, 30, 30],         # trainer.pml_ranges  [pml_min, pml_max]
     "domain_sizes":  [128,256,128,256,96,128],  # trainer.domain_sizes [xmin,xmax, ...]
@@ -157,7 +157,7 @@ def main():
             example_inputs=(TRACE_EXAMPLE_INPUT, TRACE_EXAMPLE_FREQ),
         )
 
-    out_path = os.path.join(MODEL_PATH, "models", "fdnn_model.pt")
+    out_path = os.path.join(MODEL_PATH, "models", "nnfd_model.pt")
     torch.jit.save(
         scripted,
         out_path,

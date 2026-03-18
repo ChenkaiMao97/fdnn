@@ -1,7 +1,7 @@
 import torch, os
 import numpy as np
 
-from fdnn.utils.PML_utils import apply_scpml, conditioners
+from nnfd.utils.PML_utils import apply_scpml, conditioners
 
 def c2r(x):
     bs, sx, sy, sz, _ = x.shape

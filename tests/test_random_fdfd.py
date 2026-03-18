@@ -14,7 +14,7 @@ Usage
 
     # Download model from HuggingFace first:
     python tests/test_random_fdfd.py \
-        --model_path hf://your-org/fdnn-maxwell-3d-v1 \
+        --model_path hf://your-org/nnfd-maxwell-3d-v1 \
         --hf_token hf_xxxxxxxx
 
     # Quick CPU sanity-check (small domain):
@@ -47,8 +47,8 @@ import matplotlib.pyplot as plt
 # Allow running from repo root without installing the package.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import fdnn
-from fdnn.utils.plot_field3d import plot_3slices
+import nnfd
+from nnfd.utils.plot_field3d import plot_3slices
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ def main():
     if model_path.startswith("hf://"):
         repo_id = model_path[len("hf://"):]
         print(f"Downloading model from HuggingFace: {repo_id}")
-        model_path = fdnn.hub.download(repo_id, token=args.hf_token)
+        model_path = nnfd.hub.download(repo_id, token=args.hf_token)
         print(f"Model downloaded to: {model_path}")
 
     # ── 1. Simulation parameters ──────────────────────────────────────────────
@@ -178,7 +178,7 @@ def main():
     print(f"  src  shape : {tuple(src_batch.shape)}")
 
     # ── 3. Build solver ───────────────────────────────────────────────────────
-    solver = fdnn.NN_solver(model_path=model_path)
+    solver = nnfd.NN_solver(model_path=model_path)
     solver.config({
         "device":    args.device,
         "tol":       args.tol,

@@ -1,12 +1,12 @@
 """
-Model hub utilities for fdnn — backed by HuggingFace Hub.
+Model hub utilities for nnfd — backed by HuggingFace Hub.
 
 Download a pre-trained model
 -----------------------------
-    import fdnn
+    import nnfd
 
-    model_path = fdnn.hub.download("your-org/fdnn-maxwell-3d-v1", token="hf_...")
-    solver = fdnn.NN_solver(model_path=model_path)
+    model_path = nnfd.hub.download("your-org/nnfd-maxwell-3d-v1", token="hf_...")
+    solver = nnfd.NN_solver(model_path=model_path)
 
 Access control
 --------------
@@ -22,16 +22,16 @@ explicitly grant access to can download it:
 
 In both cases, downloaders pass their personal HF token:
 
-    model_path = fdnn.hub.download("your-org/fdnn-maxwell-3d-v1",
+    model_path = nnfd.hub.download("your-org/nnfd-maxwell-3d-v1",
                                    token="hf_<user_read_token>")  # token omittable if public
 
 Upload a model (owner only)
 ----------------------------
-    import fdnn
+    import nnfd
 
-    fdnn.hub.upload(
-        model_path="./my_model",     # directory containing models/fdnn_model.pt
-        repo_id="your-org/fdnn-maxwell-3d-v1",
+    nnfd.hub.upload(
+        model_path="./my_model",     # directory containing models/nnfd_model.pt
+        repo_id="your-org/nnfd-maxwell-3d-v1",
         token="hf_<your_write_token>",
         private=True,                # keep the repo private
     )
@@ -43,8 +43,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
-_DEFAULT_CACHE = Path.home() / ".cache" / "fdnn"
-_MODEL_FILENAME = "fdnn_model.pt"
+_DEFAULT_CACHE = Path.home() / ".cache" / "nnfd"
+_MODEL_FILENAME = "nnfd_model.pt"
 _MODEL_SUBDIR   = "models"
 
 
@@ -56,7 +56,7 @@ def download(
     token: Optional[str] = None,
     force: bool = False,
 ) -> str:
-    """Download a pre-trained fdnn model from HuggingFace Hub.
+    """Download a pre-trained nnfd model from HuggingFace Hub.
 
     The model is cached locally so subsequent calls are instant (unless
     ``force=True``).
@@ -64,10 +64,10 @@ def download(
     Parameters
     ----------
     model_name:
-        HuggingFace repository ID, e.g. ``"your-org/fdnn-maxwell-3d-v1"``.
+        HuggingFace repository ID, e.g. ``"your-org/nnfd-maxwell-3d-v1"``.
     cache_dir:
         Root directory for cached models.
-        Defaults to ``~/.cache/fdnn/``.
+        Defaults to ``~/.cache/nnfd/``.
     token:
         HuggingFace user access token (read).  Required for private or gated
         repositories.  Can also be set via the ``HF_TOKEN`` / ``HUGGING_FACE_HUB_TOKEN``
@@ -78,15 +78,15 @@ def download(
     Returns
     -------
     str
-        Path to the local model directory (contains ``models/fdnn_model.pt``),
-        suitable for passing directly to :class:`~fdnn.solver.NN_solver`.
+        Path to the local model directory (contains ``models/nnfd_model.pt``),
+        suitable for passing directly to :class:`~nnfd.solver.NN_solver`.
     """
     from huggingface_hub import hf_hub_download
 
     token = token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
     cache_root = Path(cache_dir) if cache_dir else _DEFAULT_CACHE
 
-    # Local destination: <cache_root>/<repo_id_flattened>/models/fdnn_model.pt
+    # Local destination: <cache_root>/<repo_id_flattened>/models/nnfd_model.pt
     safe_name  = model_name.replace("/", "--")
     local_dir  = cache_root / safe_name
     model_path = local_dir / _MODEL_SUBDIR / _MODEL_FILENAME
@@ -122,19 +122,19 @@ def upload(
     repo_id: str,
     token: str,
     private: bool = True,
-    commit_message: str = "Upload fdnn TorchScript model",
+    commit_message: str = "Upload nnfd TorchScript model",
 ) -> str:
-    """Upload a TorchScript fdnn model to HuggingFace Hub.
+    """Upload a TorchScript nnfd model to HuggingFace Hub.
 
     Creates the repository if it does not exist.
 
     Parameters
     ----------
     model_path:
-        Local directory containing ``models/fdnn_model.pt``
-        (the standard fdnn checkpoint layout).
+        Local directory containing ``models/nnfd_model.pt``
+        (the standard nnfd checkpoint layout).
     repo_id:
-        Target HuggingFace repository, e.g. ``"your-org/fdnn-maxwell-3d-v1"``.
+        Target HuggingFace repository, e.g. ``"your-org/nnfd-maxwell-3d-v1"``.
     token:
         HuggingFace user access token with **write** permission.
     private:
@@ -185,15 +185,15 @@ def upload(
     if private:
         print("  - Repository is PRIVATE.  Only you and invited collaborators can download it.")
         print("  - Invite collaborators at: https://huggingface.co/{repo_id}/settings/members")
-        print("  - Collaborators download with:  fdnn.hub.download(repo_id, token='hf_...')")
+        print("  - Collaborators download with:  nnfd.hub.download(repo_id, token='hf_...')")
     else:
         print("  - Repository is PUBLIC.")
     return str(repo_url)
 
 
 def list_models():
-    """List available pre-trained fdnn models (placeholder)."""
+    """List available pre-trained nnfd models (placeholder)."""
     raise NotImplementedError(
         "list_models() is not yet implemented. "
-        "Browse available models at https://huggingface.co/models?search=fdnn"
+        "Browse available models at https://huggingface.co/models?search=nnfd"
     )

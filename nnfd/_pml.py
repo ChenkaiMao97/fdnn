@@ -32,7 +32,7 @@ import torch
 import numpy as np
 from typing import Optional, Tuple
 
-from fdnn.PML_utils import apply_scpml
+from nnfd.PML_utils import apply_scpml
 
 def build_pml_channels(
     sim_shape: Tuple[int, int, int],

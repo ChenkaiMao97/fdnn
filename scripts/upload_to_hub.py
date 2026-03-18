@@ -1,16 +1,16 @@
 """
-Upload an fdnn TorchScript model to HuggingFace Hub.
+Upload an nnfd TorchScript model to HuggingFace Hub.
 
 Usage
 -----
     python scripts/upload_to_hub.py \
         --model_path /path/to/model_dir \
-        --repo_id    your-hf-username/fdnn-maxwell-3d-v1 \
+        --repo_id    your-hf-username/nnfd-maxwell-3d-v1 \
         --token      hf_xxxxxxxxxxxxxxxx \
         [--public]
 
 The model directory must contain:
-    <model_path>/models/fdnn_model.pt
+    <model_path>/models/nnfd_model.pt
 
 By default the repository is created as PRIVATE.  Pass --public to make it
 public.
@@ -25,10 +25,10 @@ invite.  To invite someone:
 
 Collaborators then download with:
 
-    import fdnn
-    model_path = fdnn.hub.download("your-org/fdnn-maxwell-3d-v1",
+    import nnfd
+    model_path = nnfd.hub.download("your-org/nnfd-maxwell-3d-v1",
                                    token="hf_<their_read_token>")
-    solver = fdnn.NN_solver(model_path=model_path)
+    solver = nnfd.NN_solver(model_path=model_path)
 
 Gated access (alternative)
 ---------------------------
@@ -44,22 +44,22 @@ import os
 # Allow running from repo root without installing the package.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fdnn import hub
+from nnfd import hub
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Upload fdnn TorchScript model to HuggingFace Hub.",
+        description="Upload nnfd TorchScript model to HuggingFace Hub.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
     parser.add_argument(
         "--model_path", required=True,
-        help="Local directory containing models/fdnn_model.pt",
+        help="Local directory containing models/nnfd_model.pt",
     )
     parser.add_argument(
         "--repo_id", required=True,
-        help="HuggingFace repository ID, e.g. 'your-name/fdnn-maxwell-3d-v1'",
+        help="HuggingFace repository ID, e.g. 'your-name/nnfd-maxwell-3d-v1'",
     )
     parser.add_argument(
         "--token",
@@ -71,7 +71,7 @@ def main():
         help="Make the repository public (default: private).",
     )
     parser.add_argument(
-        "--message", default="Upload fdnn TorchScript model",
+        "--message", default="Upload nnfd TorchScript model",
         help="Commit message for the upload.",
     )
     args = parser.parse_args()

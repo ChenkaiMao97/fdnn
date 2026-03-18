@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-from fdnn.utils.plot_field3d import plot_3slices
+from nnfd.utils.plot_field3d import plot_3slices
 
 def MAE(a, b):
     return torch.mean(torch.abs(a-b))/torch.mean(torch.abs(b))

@@ -8,8 +8,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import torch
 
-from fdnn.config import SolverConfig
-from fdnn._pml import build_pml_channels
+from nnfd.config import SolverConfig
+from nnfd._pml import build_pml_channels
 
 
 class NN_solver:
@@ -17,9 +17,9 @@ class NN_solver:
 
     Usage::
 
-        import fdnn
+        import nnfd
 
-        solver = fdnn.NN_solver(model_path="./my_model")
+        solver = nnfd.NN_solver(model_path="./my_model")
         solver.config({
             "tol":        1e-5,
             "max_iter":   100,
@@ -43,12 +43,12 @@ class NN_solver:
 
     Checkpoint format
     -----------------
-    The solver expects ``<model_path>/models/fdnn_model.pt`` with structure::
+    The solver expects ``<model_path>/models/nnfd_model.pt`` with structure::
 
         {
             "state_dict": <OrderedDict>,
             "meta": {
-                "fdnn_version":  "0.1.0",
+                "nnfd_version":  "0.1.0",
                 "model_type":    "<registered model key>",
                 "model_kwargs":  { ... },   # passed to model constructor
                 "ln_R":          -16,
@@ -60,14 +60,14 @@ class NN_solver:
 
     Model path
     ----------
-    Pass ``model_path`` directly or set the ``FDNN_MODEL_PATH`` env variable.
+    Pass ``model_path`` directly or set the ``NNFD_MODEL_PATH`` env variable.
     """
 
     def __init__(self, model_path: Optional[str] = None) -> None:
-        self.model_path = model_path or os.environ.get("FDNN_MODEL_PATH")
+        self.model_path = model_path or os.environ.get("NNFD_MODEL_PATH")
         if not self.model_path:
             raise ValueError(
-                "model_path must be provided or the FDNN_MODEL_PATH "
+                "model_path must be provided or the NNFD_MODEL_PATH "
                 "environment variable must be set."
             )
         self._cfg = SolverConfig()
@@ -81,7 +81,7 @@ class NN_solver:
     def config(self, cfg: dict) -> "NN_solver":
         """Update solver configuration. Returns self for chaining.
 
-        Accepts any subset of :class:`~fdnn.config.SolverConfig` field names.
+        Accepts any subset of :class:`~nnfd.config.SolverConfig` field names.
         """
         valid_keys = set(self._cfg.__dataclass_fields__)
         unknown = set(cfg.keys()) - valid_keys
@@ -165,7 +165,7 @@ class NN_solver:
             return
         self._cfg.validate()
 
-        ckpt_path = os.path.join(self.model_path, "models", "fdnn_model.pt")
+        ckpt_path = os.path.join(self.model_path, "models", "nnfd_model.pt")
         if not os.path.exists(ckpt_path):
             raise FileNotFoundError(
                 f"Expected checkpoint at {ckpt_path}.\n"
@@ -279,9 +279,9 @@ class NN_solver:
         pml_layers: tuple,
     ) -> Tuple[torch.Tensor, float]:
         """Run one GMRES solve on a single mini-batch chunk."""
-        from fdnn.solvers.gmres import mygmrestorch
-        from fdnn.utils.physics import residue_E, src2rhs
-        from fdnn.utils.utils import c2r, r2c
+        from nnfd.solvers.gmres import mygmrestorch
+        from nnfd.utils.physics import residue_E, src2rhs
+        from nnfd.utils.utils import c2r, r2c
 
         cfg = self._cfg
         model = self._gpu_contexts[gpu_id]["model"]
