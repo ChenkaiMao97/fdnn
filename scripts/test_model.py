@@ -10,14 +10,14 @@ import sys
 import torch
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-MODEL_PT = "/path/to/your/model/models/fdnn_model.pt"
+MODEL_PT = "/media/ps3/chenkaim/checkpoints/copied_models/aperiodic_CondConv_30_pml_small-10_16_25T15_21_04/models/fdnn_model.pt"
 
 # Spatial size to test with — pick something small and fast on CPU.
 SX, SY, SZ = 32, 32, 32
 
 # eps channels = 1 (permittivity) + number of PML channels your model was trained with.
 # Check your gin config: input_channel_eps = ?
-INPUT_CHANNEL_EPS = 7   # adjust to match your trained model
+INPUT_CHANNEL_EPS = 4   # adjust to match your trained model
 
 # Physics params (only used to compute freq = dL/wavelength)
 DL         = 0.05
